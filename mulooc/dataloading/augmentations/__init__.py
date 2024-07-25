@@ -7,7 +7,8 @@ from .time_stretch import BetaTimeStretchAudiomentation as BetaTimeStretch
 from .time_stretch import LogUniformTimeStretchAudiomentation as LogUniformTimeStretch
 from .reverse import Reverse
 
-from .pedalboard_audiomentation import PedalBoardAudiomentation
+
+from .pedalboard_audiomentation import PedalBoardAudiomentation, MultiPedalBoardAudiomentation
 
 from .chorus import ChorusAudiomentation
 from .compression import CompressorAudiomentation
@@ -16,4 +17,5 @@ from .reverb import ReverbAudiomentation
 from .bitcrush import BitcrushAudiomentation
 from .background import AddBackgroundNoiseAudiomentation
 from .custom_pitch_shift import PitchShiftAudiomentation
-from .stereo import Pan, Width
+from .stereo import Pan, Width, Stereo
+from .eqband import EQ8Band

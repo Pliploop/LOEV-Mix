@@ -28,7 +28,15 @@ class Melgram(nn.Module):
         stype = 'power' if self.power == 2 else 'magnitude'
         self.compressor = torchaudio.transforms.AmplitudeToDB(stype)
         
-    def  forward(self, x):
-        x = self.mel(x)
-        x = self.compressor(x)
+    def  forward(self, x, mono = False):
+        
+        if mono:
+            x = self.mel(x)
+            x = self.compressor(x)
+        else:
+            L,R = x[:,0,...], x[:,1,...]
+            L,R = self.mel(L), self.mel(R)
+            L,R = self.compressor(L), self.compressor(R)
+            x = torch.stack([L,R], dim = 1)
+            
         return x

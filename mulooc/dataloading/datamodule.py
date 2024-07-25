@@ -71,24 +71,33 @@ class AudioDataModule(pl.LightningDataModule):
                 "highpass": {"p": 0.5, "sample_rate": self.target_sr, "min_cutoff_freq": 200, "max_cutoff_freq": min(0.5 * self.target_sr, 2400)},
                 "lowpass": {"p": 0.5, "sample_rate": self.target_sr, "min_cutoff_freq": 75, "max_cutoff_freq": 7500}
             },
-            "discrete_pitch_shift": {"p": 0.5, "sample_rate": self.target_sr, "min_transpose_semitones": -4, "max_transpose_semitones": 4},
+            '8band' : {
+                'p' : 0.5,
+                'lowpass' : {"p": 0.25, "sample_rate": self.target_sr, "min_cutoff_frequency_hz": 15000, "max_cutoff_frequency_hz": 16000},
+                'highpass' : {"p": 0.25, "sample_rate": self.target_sr, "min_cutoff_frequency_hz": 20, "max_cutoff_frequency_hz": 200},
+                'lowshelf' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 20, "max_cutoff_frequency_hz": 100, 'min_q' : 0.5, 'max_q' : 2},
+                'highshelf' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 15000, "max_cutoff_frequency_hz": 20000, 'min_q' : 0.5, 'max_q' : 2},
+                'band1' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 200, "max_cutoff_frequency_hz": 400, 'min_q' : 0.5, 'max_q' : 2},
+                'band2' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 400, "max_cutoff_frequency_hz": 800, 'min_q' : 0.5, 'max_q' : 2},
+                'band3' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 800, "max_cutoff_frequency_hz": 1600, 'min_q' : 0.5, 'max_q' : 2},
+                'band4' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 1600, "max_cutoff_frequency_hz": 3200, 'min_q' : 0.5, 'max_q' : 2},
+                'band5' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 3200, "max_cutoff_frequency_hz": 6400, 'min_q' : 0.5, 'max_q' : 2},
+                'band6' : {"p": 0.5, "sample_rate": self.target_sr, "min_gain_db": -10, "max_gain_db": 10, "min_cutoff_frequency_hz": 6400, "max_cutoff_frequency_hz": 12800, 'min_q' : 0.5, 'max_q' : 2},
+            },
             'pitch_shift': {"p": 0.5, "sample_rate": self.target_sr, "min_semitones": -4, "max_semitones": 4},
             "delay": {"p": 0.5, "sample_rate": self.target_sr, "min_delay_ms": 100, "max_delay_ms": 500, "volume_factor": 0.5, "repeats": 2, "attenuation": 0.5},
             "timestretch": {"p": 0.5, "sample_rate": self.target_sr, "min_stretch_rate": 0.7, "max_stretch_rate": 1.3},
-            "discrete_timestretch": {"p": 0.5, "sample_rate": self.target_sr, "min_stretch_rate": 0.7, "max_stretch_rate": 1.3},
-            "beta_timestretch": {"p": 0.5, "sample_rate": self.target_sr, "min_stretch_rate": 0.7, "max_stretch_rate": 1.3},
-            "log_uniform_timestretch": {"p": 0.5, "sample_rate": self.target_sr, "min_stretch_rate": 0.7, "max_stretch_rate": 1.3},
             "reverb": {"p": 0.5, "sample_rate": self.target_sr, "room_size": 0.2, "wet_level": 0.5, "dry_level": 0.5},
             "chorus": {"p": 0.5, "sample_rate": self.target_sr, "mix": 1, "rate_hz": 5, "depth": 1},
-            "distortion": {"p": 0.5, "sample_rate": self.target_sr, "drive_db": 9},
-            "compression": {"p": 0.5, "sample_rate": self.target_sr, "threshold_db": -30, "ratio": 5},
+            "distortion": {"p": 0.5, "sample_rate": self.target_sr, "max_drive_db": 20, "min_drive_db": 0},
+            "compression": {"p": 0.5, "sample_rate": self.target_sr, "min_threshold_db": -20, "max_threshold_db": -5, "min_ratio": 1, "max_ratio": 10},
             "reverse": {"p": 0.5, "sample_rate": self.target_sr},
             "bitcrush": {"p": 0.5, "sample_rate": self.target_sr, "bit_depth": 4},
             "mp3": {"p": 0.5, "sample_rate": self.target_sr, "vbr_quality": 9},
             "pan": {"p": 0.5, "sample_rate": self.target_sr, "min_pan": -1, "max_pan": 1},
             "width": {"p": 0.5, "sample_rate": self.target_sr, "min_width": 0, "max_width": 1},
-            "background": {"p": 0.5, "sample_rate": self.target_sr, "min_snr_in_db": -3, "max_snr_in_db": 12, "background_paths": '/import/c4dm-datasets-ext/audioset-01/audioset/balanced_train_segments'}
-        }
+            "stereo": {"p": 0.5, "sample_rate": self.target_sr, "min_pan": -1, "max_pan": 1, "min_width": 0, "max_width": 1},
+            }
 
         self.augs = {
             'gain': lambda kwargs: Gain(**kwargs),
@@ -102,13 +111,13 @@ class AudioDataModule(pl.LightningDataModule):
             ]),
             'pitch_shift': lambda kwargs: PitchShiftAudiomentation(**kwargs),
             'timestretch': lambda kwargs: TimeStretch(**kwargs),
-            'discrete_timestretch': lambda kwargs: DiscreteTimeStretch(**kwargs),
-            'beta_timestretch': lambda kwargs: BetaTimeStretch(**kwargs),
-            'log_uniform_timestretch': lambda kwargs: LogUniformTimeStretch(**kwargs),
             'reverb': lambda kwargs: ReverbAudiomentation(**kwargs),
             'distortion': lambda kwargs: DistortionAudiomentation(**kwargs),
+            'compression': lambda kwargs: CompressorAudiomentation(**kwargs),
             'pan' : lambda kwargs: Pan(**kwargs),
             'width' : lambda kwargs: Width(**kwargs),
+            '8band' : lambda kwargs: EQ8Band(**kwargs),
+            'stereo' : lambda kwargs: Stereo(**kwargs),
             
         }
 

@@ -33,7 +33,8 @@ class PedalBoardAudiomentation(BaseWaveformTransform):
         sample_rate: int = None,
         target_rate: int = None,
         output_type: Optional[str] = 'dict',
-        randomize_parameters: bool = True,):
+        randomize_parameters: bool = True,
+        name = ''):
         super().__init__(
             mode=mode,
             p=p,
@@ -60,7 +61,8 @@ class PedalBoardAudiomentation(BaseWaveformTransform):
         self._board = board
         self._sample_rate = sample_rate
         self._mode = mode
-        self._p = p
+        self._p = p 
+        self._name = name
 
         
         self.transform_parameters = {}
@@ -104,6 +106,7 @@ class PedalBoardAudiomentation(BaseWaveformTransform):
                     self._board[0].__setattr__(key, self.transform_parameters[key][i]) if key!="should_apply" else None
             samples[i, ...] = self.process(samples[i][None])
         
+        
         return ObjectDict(
             samples=samples,
             sample_rate=sample_rate,
@@ -112,9 +115,6 @@ class PedalBoardAudiomentation(BaseWaveformTransform):
             should_apply = self.transform_parameters["should_apply"]
         )    
 
-    # TODO : implement parameter randomization
-    # TODO : implement per-batch and per-channel modes
-    
     def set_kwargs(self, **kwargs):
         
         # kwargs is a dictionary of parameters.
@@ -171,3 +171,125 @@ class PedalBoardAudiomentation(BaseWaveformTransform):
             
                     
         # print(self.transform_parameters)
+    
+    def set_name(self, name):
+        self._name = name
+        
+class MultiPedalBoardAudiomentation(BaseWaveformTransform):
+    """
+    A wrapper for pedalboard, a python package for audio effects.
+    Callable, and can be used as a torch transform.
+    """
+    
+    
+    supported_modes = {"per_example"}
+
+    supports_multichannel = True
+    requires_sample_rate = True
+
+    supports_target = True
+    requires_target = False
+
+    
+    def __init__(self, boards,
+                  mode: str = "per_example",
+        p: float = 0.5,
+        p_mode: str = None,
+        sample_rate: int = None,
+        target_rate: int = None,
+        output_type: Optional[str] = 'dict',
+        randomize_parameters: bool = True,):
+        super().__init__(
+            mode=mode,
+            p=p,
+            p_mode=p_mode,
+            sample_rate=sample_rate,
+            target_rate=target_rate,
+            output_type=output_type,
+        )
+        """
+        :param board: Pedalboard object: Pedalboard object to be used for audio processing
+        :param sample_rate:
+        :param mode: ``per_example``, ``per_channel``, or ``per_batch``. Default ``per_example``.
+        :param p:
+        :param p_mode:
+        :param target_rate:
+        
+        """
+        self._randomize_parameters = randomize_parameters
+        if self.mode not in self.supported_modes:
+            raise ValueError(
+                f"Invalid mode: {self.mode}. Supported modes are: {self.supported_modes}"
+            )
+        
+    
+        self._boards = boards
+        self._sample_rate = sample_rate
+        self._mode = mode
+        self._p = p
+
+        
+        self.transform_parameters = {}
+        self.transform_ranges = {}
+        
+    # indexing with [] should return self._board[index]
+    
+    # def __call__(self, samples):
+    #     return self.process(samples)
+    
+    
+    def apply_transform(
+        
+        self,
+        samples: Tensor = None,
+        sample_rate: Optional[int] = None,
+        targets: Optional[Tensor] = None,
+        target_rate: Optional[int] = None,
+    ) -> ObjectDict:
+        
+        batch_size, num_channels, num_samples = samples.shape
+        
+        
+        for board in self._boards:
+            samples = board(samples)
+        
+        return ObjectDict(
+            samples=samples,
+            sample_rate=sample_rate,
+            targets=targets,
+            target_rate=target_rate,
+            # should_apply = self.transform_parameters["should_apply"]
+        )
+        
+        
+    def set_kwargs(self, kwargs):
+        for k in range(len(kwargs)):
+            kwarg = kwargs[k]
+            self._boards[k].set_kwargs(**kwarg)
+            
+            self.transform_ranges.update(self._boards[k].transform_ranges)
+            
+    def randomize_parameters(self,
+        samples: Tensor = None,
+        sample_rate: Optional[int] = None,
+        targets: Optional[Tensor] = None,
+        target_rate: Optional[int] = None,):
+        
+        for board in self._boards:
+            board.randomize_parameters(samples, sample_rate, targets, target_rate)
+        
+    def __call__(self, samples: Tensor, sample_rate: int, targets: Optional[Tensor] = None, target_rate: Optional[int] = None) -> ObjectDict:
+        out_ =  self.forward(samples, sample_rate, targets, target_rate)
+        
+        # should_apply = []
+        for board in self._boards:
+            # should_apply.append(board.transform_parameters["should_apply"])
+            board_tfms = board.transform_parameters
+            # change the keys to the names
+            board_tfms = {board._name + "_" + key: board_tfms[key] for key in board_tfms}
+            self.transform_parameters.update(board_tfms)
+            
+        # global_should_apply = [any(t) for t in zip(*should_apply)]
+        # self.transform_parameters["should_apply"] = torch.tensor(global_should_apply)
+        
+        return out_

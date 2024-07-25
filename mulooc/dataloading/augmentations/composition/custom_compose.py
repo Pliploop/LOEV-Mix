@@ -66,8 +66,6 @@ class CustomCompose(BaseCompose):
                     samples = inputs.samples
                     inputs = self.transforms[i](**inputs)
                     
-                    # changed = (new_samples.sum(dim=(1, 2)) != samples.sum(dim=(1, 2))).int()
-                    
                     if self.return_tfms:
                         # each transform has a ditionary attribute trackable_params, for which the keys are the names of the parameters that are tracked and the values are the tolerance values and the default
                         # for each parameter, tolerance pair, if the parameter changes by more than the tolerance, the sample is considered transformed
@@ -85,10 +83,19 @@ class CustomCompose(BaseCompose):
                                     changed_matrix = changed_matrix * (self.transforms[i].transform_parameters[param_name].unsqueeze(1) != self.transforms[i].transform_parameters[param_name])
                                 
                                 changed = changed_matrix
-                                print(changed.shape)
                                     
                         else :
                             
+                            # get all the keys containing should_apply
+                            # should_apply = []
+                            # for key in self.transforms[i].transform_parameters:
+                            #     if "should_apply" in key:
+                            #         should_apply.append(self.transforms[i].transform_parameters[key])
+                            #         print(key)
+                            
+                            # print(should_apply)
+                            # changed = [any(t) for t in zip(*should_apply)]
+                            # print(changed)
                             changed = self.transforms[i].transform_parameters["should_apply"].int()
                         
                         transformed[self.transform_names[i]] = changed
@@ -107,12 +114,11 @@ class CustomCompose(BaseCompose):
         if self.return_tfms:
             for transform in self.transforms:
                     for key in transform.transform_parameters:
-                        new_params = transform.transform_parameters[key]
+                        new_params = list(transform.transform_parameters[key])
                         if key != "should_apply":
                             
                             for i in range(len(transform.transform_parameters['should_apply'])):
                                 if not transform.transform_parameters['should_apply'][i]:
-                                    # insert None for non-transformed samples
                                     new_params.insert(i, None)
                             transform.transform_parameters[key] = new_params
                 

@@ -33,15 +33,7 @@ class Width(BaseWaveformTransform):
         target_rate: int = None,
         output_type: Optional[str] = None,
         ):
-        """
-        :param sample_rate:
-        :param min_delay_ms: Minimum delay in milliseconds (default 20.0)
-        :param max_delay_ms: Maximum delay in milliseconds (default 100.0)
-        :param mode: ``per_example``, ``per_channel``, or ``per_batch``. Default ``per_example``.
-        :param p:
-        :param p_mode:
-        :param target_rate:
-        """
+
         super().__init__(
             mode=mode,
             p=p,
@@ -117,6 +109,7 @@ class Width(BaseWaveformTransform):
                 sample_rate
             )
 
+
         return ObjectDict(
             samples=samples,
             sample_rate=sample_rate,
@@ -128,7 +121,6 @@ class Width(BaseWaveformTransform):
         
        # time stretch the signal and truncate to the original length
         
-        print("widening")
         
         width = 2 * np.clip(width,0,1)
         
@@ -168,15 +160,7 @@ class Pan(BaseWaveformTransform):
         target_rate: int = None,
         output_type: Optional[str] = None,
         ):
-        """
-        :param sample_rate:
-        :param min_delay_ms: Minimum delay in milliseconds (default 20.0)
-        :param max_delay_ms: Maximum delay in milliseconds (default 100.0)
-        :param mode: ``per_example``, ``per_channel``, or ``per_batch``. Default ``per_example``.
-        :param p:
-        :param p_mode:
-        :param target_rate:
-        """
+        
         super().__init__(
             mode=mode,
             p=p,
@@ -261,10 +245,6 @@ class Pan(BaseWaveformTransform):
         
     def pan(self,samples: Tensor, angle = 0, sr = 22050) -> Tensor:
         
-        # pan stereo file to angle between 90 and -90 degrees
-        
-        print("panning")
-        
         L = samples[:,0,:]
         R = samples[:,1,:]
         
@@ -274,3 +254,100 @@ class Pan(BaseWaveformTransform):
         R = R * np.sin(angle * np.pi/2)
         
         return torch.stack([L,R],dim = 1)
+    
+
+#class that combines both
+class Stereo(BaseWaveformTransform):
+    
+    supported_modes = {"per_batch", "per_example", "per_channel"}
+
+    supports_multichannel = True
+    requires_sample_rate = True
+
+    supports_target = True
+    requires_target = False
+
+    def __init__(
+        self,
+        max_pan: float = 1.0,
+        min_pan: float = -1.0,
+        max_width: float = 1.0,
+        min_width: float = 0.0,
+        mode: str = "per_example",
+        p: float = 0.5,
+        p_mode: str = None,
+        sample_rate: int = None,
+        target_rate: int = None,
+        output_type: Optional[str] = None,
+        ):
+
+        super().__init__(
+            mode=mode,
+            p=p,
+            p_mode=p_mode,
+            sample_rate=sample_rate,
+            target_rate=target_rate,
+            output_type=output_type,
+        )
+
+        if min_pan > max_pan:
+            raise ValueError("max_pan must be > min_pan")
+        if not sample_rate:
+            raise ValueError("sample_rate is invalid.")
+        self.pan = Pan(max_pan = max_pan, min_pan = min_pan, mode = mode, p = 1, p_mode = p_mode, sample_rate = sample_rate, target_rate = target_rate, output_type = output_type)
+        self.width = Width(max_width = max_width, min_width = min_width, mode = mode, p = 1, p_mode = p_mode, sample_rate = sample_rate, target_rate = target_rate, output_type = output_type)
+        
+    def randomize_parameters(
+        self,
+        samples: Tensor = None,
+        sample_rate: Optional[int] = None,
+        targets: Optional[Tensor] = None,
+        target_rate: Optional[int] = None,
+    ):
+        """
+        :param samples: (batch_size, num_channels, num_samples)
+        :param sample_rate:
+        """
+        self.pan.randomize_parameters(samples, sample_rate, targets, target_rate)
+        self.width.randomize_parameters(samples, sample_rate, targets, target_rate)
+        
+        
+    def apply_transform(
+            
+            self,
+            samples: Tensor = None,
+            sample_rate: Optional[int] = None,
+            targets: Optional[Tensor] = None,
+            target_rate: Optional[int] = None,
+        ) -> ObjectDict:
+            """
+            :param samples: (batch_size, num_channels, num_samples)
+            :param sample_rate:
+            """
+            
+            
+            
+            samples = self.pan(samples, sample_rate, targets, target_rate)
+            samples = self.width(samples, sample_rate, targets, target_rate)
+            if 'pans' in self.pan.transform_parameters:
+                self.transform_parameters['pans'] = self.pan.transform_parameters.get('pans', None)
+            if 'widths' in self.width.transform_parameters:
+                self.transform_parameters['widths'] = self.width.transform_parameters.get('widths', None)
+            
+    
+            return ObjectDict(
+                samples=samples,
+                sample_rate=sample_rate,
+                targets=targets,
+                target_rate=target_rate,
+            )
+            
+    def __call__(self, samples: Tensor, sample_rate: int, targets: Optional[Tensor] = None, target_rate: Optional[int] = None) -> ObjectDict:
+        out_ =  self.forward(samples, sample_rate, targets, target_rate)
+        # self.transform_parameters['should_apply'] = torch.tensor([any(t) for t in zip(self.pan.transform_parameters['should_apply'], self.width.transform_parameters['should_apply'])])
+        
+        # print(self.transform_parameters)
+        # print(self.pan.transform_parameters)
+        # print(self.width.transform_parameters)
+        
+        return out_

@@ -316,7 +316,7 @@ class ParallelNFNetStage(nn.Module):
         return x
     
 class NFNet(nn.Module):
-    def __init__(self, frontend = None, f_value = 0, alpha = 0.2, scaled_activation_type = 'gelu'):
+    def __init__(self, frontend = None, f_value = 0, alpha = 0.2, scaled_activation_type = 'gelu', mono = True):
         super(NFNet, self).__init__()
 
         # Initialize parameters for NFNet Blocks
@@ -331,6 +331,11 @@ class NFNet(nn.Module):
         self.scaled_activation = _scaled_activation(scaled_activation_type)
         self.projector_activation = torch.nn.functional.relu
 
+        if mono:
+            in_chans = 1
+        else:
+            in_chans = 2
+
         # Make Stems
         print("Making Stems")
         self.slow_stem = StemModule(
@@ -340,7 +345,7 @@ class NFNet(nn.Module):
                     [3, 1],
                     [3, 3]
                 ],
-                in_channels=[1,16, 32, 64],
+                in_channels=[in_chans,16, 32, 64],
                 out_channels=[16, 32, 64, 128],
                 strides=[
                     [2, 8], # Integrated data striding layer into first convolution
@@ -364,7 +369,7 @@ class NFNet(nn.Module):
                     [3, 3],
                     [3, 3]
                 ],
-                in_channels=[1,2, 4, 8],
+                in_channels=[in_chans,2, 4, 8],
                 out_channels=[2, 4, 8, 16],
                 strides=[
                     [2, 2], # Integrated data striding layer into first convolution
@@ -512,7 +517,7 @@ class NFNet(nn.Module):
     
     
 class NFNetPlus(nn.Module):
-    def __init__(self, frontend = None, f_value = 0, alpha = 0.2, scaled_activation_type = 'gelu', parallel_lastblock = 2, from_parallel = 1):
+    def __init__(self, frontend = None, f_value = 0, alpha = 0.2, scaled_activation_type = 'gelu', parallel_lastblock = 2, from_parallel = 1, mono = True):
         super(NFNetPlus, self).__init__()
 
         # Initialize parameters for NFNet Blocks
@@ -528,6 +533,9 @@ class NFNetPlus(nn.Module):
         self.projector_activation = torch.nn.functional.relu
 
         # Make Stems
+        in_chans = 1 if mono else 2
+        
+        
         print("Making Stems")
         self.slow_stem = StemModule(
                 kernels=[
@@ -536,7 +544,7 @@ class NFNetPlus(nn.Module):
                     [3, 1],
                     [3, 3]
                 ],
-                in_channels=[1,16, 32, 64],
+                in_channels=[in_chans,16, 32, 64],
                 out_channels=[16, 32, 64, 128],
                 strides=[
                     [2, 8], # Integrated data striding layer into first convolution
@@ -560,7 +568,7 @@ class NFNetPlus(nn.Module):
                     [3, 3],
                     [3, 3]
                 ],
-                in_channels=[1,2, 4, 8],
+                in_channels=[in_chans,2, 4, 8],
                 out_channels=[2, 4, 8, 16],
                 strides=[
                     [2, 2], # Integrated data striding layer into first convolution
@@ -590,8 +598,11 @@ class NFNetPlus(nn.Module):
             [[0, 0],[0, 1],[1, 0],[0, 0]],
             [[0, 0],[0, 1],[1, 0],[0, 0]]
         ]
-        slow_nfnet_input_sizes = [128,256, 512, 1536]
-        slow_nfnet_output_sizes = [256,512, 1536, 1536]
+        # slow_nfnet_input_sizes = [128,256, 512, 1536]
+        # slow_nfnet_output_sizes = [256,512, 1536, 1536]
+        
+        slow_nfnet_input_sizes = [128,256, 512, 1024]
+        slow_nfnet_output_sizes = [256,512, 1024, 1024]
 
         print("Making Slow Layers")
         self.slow_layers = nn.ModuleList([
@@ -649,8 +660,11 @@ class NFNetPlus(nn.Module):
             [[0, 0],[0, 1],[1, 0],[0, 0]],
             [[0, 0],[0, 1],[1, 0],[0, 0]]
         ]
-        fast_nfnet_input_sizes = [16,32, 64, 192]
-        fast_nfnet_output_sizes = [32,64, 192, 192]
+        # fast_nfnet_input_sizes = [16,32, 64, 192]
+        # fast_nfnet_output_sizes = [32,64, 192, 192]
+        
+        fast_nfnet_input_sizes = [16,32, 64, 128]
+        fast_nfnet_output_sizes = [32,64, 128, 128]
 
         print("Making Fast Layers")
         self.fast_layers = nn.ModuleList([
@@ -696,11 +710,19 @@ class NFNetPlus(nn.Module):
 
         print("Making Fusion Layers")
         # Construct fast-to-slow fusion layers
+        # self.fusion_layers = nn.ModuleList([
+        #     # FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=fast_nfnet_input_sizes[0], output_channels=slow_nfnet_output_sizes[0]),
+        #     # FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=fast_nfnet_input_sizes[1], output_channels=slow_nfnet_output_sizes[1]),
+        #     # FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=fast_nfnet_input_sizes[2], output_channels=slow_nfnet_output_sizes[2]),
+        #     # FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=fast_nfnet_input_sizes[3], output_channels=slow_nfnet_output_sizes[3])
+        #     FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=fast_nfnet_input_sizes[k], output_channels=slow_nfnet_output_sizes[k]) for k in range(len(fast_nfnet_input_sizes))
+        # ])
+
         self.fusion_layers = nn.ModuleList([
             FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=16, output_channels=128),
             FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=32, output_channels=256),
             FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=64, output_channels=512),
-            FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=192, output_channels=1536)
+            FastToSlowFusion(time_kernel_length=7, time_stride=4, input_channels=128, output_channels=1024)
         ])
 
         # Construct summarization and aggregation layers at the output
@@ -708,14 +730,11 @@ class NFNetPlus(nn.Module):
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.AdaptiveAvgPool2d((1, 1))
         ])
-        
-        
-
 
         self.frontend = frontend
         
         
-        self.embed_dim = 1728
+        self.embed_dim = slow_nfnet_output_sizes[-1] + fast_nfnet_output_sizes[-1]
         
         
 
@@ -726,7 +745,7 @@ class NFNetPlus(nn.Module):
         else:
             wav = x
         
-        spec = self.frontend(wav) if self.frontend is not None else wav
+        spec = self.frontend(wav, mono = self.mono) if self.frontend is not None else wav
         
         
         slow = self.slow_stem(spec)

@@ -92,9 +92,11 @@ class MuLOOC(nn.Module):
     def forward(self,x):
         wav = x['audio']
         if wav.dim() == 4:
-            wav = wav.contiguous().view(-1,1,wav.shape[-1]) ## [B*N_augmentations,T]
+            channels = wav.shape[-3]
+            wav = wav.contiguous().view(-1,channels,wav.shape[-1]) ## [B*N_augmentations,T]
         elif wav.dim() == 5: # spectrogram : [B*N_augmentations,1,F,T]
-            wav = wav.contiguous().view(-1,1,wav.shape[-2],wav.shape[-1])
+            channels = wav.shape[-3]
+            wav = wav.contiguous().view(-1,channels,wav.shape[-2],wav.shape[-1])
                 
         encoded = self.encoder(wav)
         

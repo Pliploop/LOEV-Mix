@@ -109,13 +109,17 @@ class AudioDataset(Dataset):
                 strategy = torch.multinomial(self.strategy_values, 1).item()
                 strategy = list(self.strategy.keys())[strategy]
                 audio = self.strategy_funcs[strategy](path, self.target_n_samples, self.target_sr, self.n_augmentations)
-                if self.mono:
-                    audio = audio.mean(dim=1, keepdim=True)
+
         except Exception as e:
             print("Error loading file:", e)
             return self[idx + 1]
         
         clean_audio = audio.clone()
+        
+        
+        if audio.shape[1] == 1 and not self.mono:
+            return self[idx + 1]
+        
         
         if self.transform and self.train and self.augmentations is not None:
             if self.keep_anchor and self.n_augmentations > 1:
@@ -131,18 +135,12 @@ class AudioDataset(Dataset):
         augs = augs if self.transform and self.train and self.augmentations is not None else {
             "none": torch.tensor([0]*self.n_augmentations)
         }
-        
-        if self.return_labels and self.tempo_stretching and self.train: #only for tempo datasets augmentation
-            audio, labels = time_stretching_module(audio, self.target_sr, self.target_n_samples, labels)
-            if audio is None:
-                return self[idx + 1]
             
         if self.max_target_n_samples:
             audio = audio[:,:,:self.max_target_n_samples]
             if self.return_clean_audio:
                 clean_audio = clean_audio[:,:,:self.max_target_n_samples]
             
-        
         if self.frontend:
             audio = self.frontend(audio)
             if self.return_clean_audio:
@@ -152,8 +150,6 @@ class AudioDataset(Dataset):
                 if self.return_clean_audio:
                     clean_audio = clean_audio.unsqueeze(0)
             
-    
-                
         if self.augmentations and self.return_tfm_parameters:
             transform_parameters = {tfm.__class__.__name__  : tfm.transform_parameters for tfm in self.augmentations['var'].transforms}
             # recursively go through the dict and turn lists into tensors
@@ -163,6 +159,8 @@ class AudioDataset(Dataset):
                         transform_parameters[key][key2] = torch.tensor(transform_parameters[key][key2])
         
         #truncate audio to max_target_n_samples
+        if self.mono:
+            audio = audio.mean(dim=1, keepdim=True)
         
         output_ = {
             "audio": audio,
@@ -178,33 +176,13 @@ class AudioDataset(Dataset):
         if self.return_clean_audio:
             output_["clean_audio"] = clean_audio
         
+        # for key in output_:
+        #     try:
+        #         print(key, output_[key].shape)
+        #     except:
+        #         print(key, output_[key])
+        
         return output_
-
-def time_stretching_module(input_audio, samplerate, factor, labels):
-    
-    factor = np.random.uniform(0.8, 1.2)
-    tempo = labels.argmax()
-    new_tempo = int(tempo * factor)
-    labels = torch.zeros_like(labels)
-    
-    if new_tempo < labels.shape[0]:
-        labels[new_tempo] = 1
-    else:
-        return None,None
-    
-    original_shape = input_audio.shape
-    
-    audio = input_audio.squeeze(0)
-    audio = time_stretch(input_audio = audio.numpy(), samplerate = samplerate, stretch_factor = factor)
-    audio = torch.tensor(audio).unsqueeze(0)
-    
-    audio = torch.nn.functional.pad(audio, (0, max(0, original_shape[2] - audio.shape[2])))
-    audio = audio[:,:,:original_shape[2]]
-
-    
-    
-    return audio, labels
-
 
 
 class PrecomputedDataset(Dataset):

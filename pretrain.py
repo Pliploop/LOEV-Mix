@@ -42,7 +42,7 @@ class MyLightningCLI(LightningCLI):
         parser.add_argument("--ckpt_path", default="checkpoints")
         parser.add_argument("--resume_id", default=None)
         parser.add_argument("--resume_from_checkpoint", default=None)
-        parser.add_argument("--project", default="MuLOOC-sandbox")
+        parser.add_argument("--project", default="LOEV-Mix")
 
 
 if __name__ == "__main__":
